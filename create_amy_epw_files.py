@@ -60,11 +60,10 @@ parser.add_argument('--allow-downloads',
                     help=f"""This script depends on TMY (typical meteorological year) EPW files that are available from
                              http://climate.onebuilding.org. If you pass this option, TMY EPW files will automatically
                              be downloaded as needed to generate the AMY EPW files defined in files_to_convert.csv.
-                             If you do not pass this flag, you will be prompted to give permission when missing TMY
-                             files are found. If you prefer, you may also manually trigger the download of the file
-                             for a given WMO Index by using the diyepw.get_tmy_epw_file() function provided by the 
-                             diyepw package in your own Python script. Alternatively, you could download the files for
-                             whatever WMO Indices you intend to generate AMY EPW files for into the following directory: 
+                             If you prefer, you may also manually trigger the download of the file for a given WMO Index 
+                             by using the diyepw.get_tmy_epw_file() function provided by the diyepw package in your own 
+                             Python script. Alternatively, you could download the files for whatever WMO Indices you 
+                             intend to generate AMY EPW files for into the following directory: 
                              {pkg_resources.resource_filename('diyepw', 'data/noaa_isd_lite_files')}"""
 )
 args = parser.parse_args()
