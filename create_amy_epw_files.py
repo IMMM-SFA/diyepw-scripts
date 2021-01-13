@@ -87,7 +87,8 @@ for idx, amy_file_path in enumerate(amy_file_list, start = 1):
             max_records_to_impute=args.max_records_to_impute,
             max_records_to_interpolate=args.max_records_to_interpolate,
             amy_epw_dir=amy_epw_file_out_path,
-            amy_files=(amy_file_path, amy_subsequent_year_file_path)
+            amy_files=(amy_file_path, amy_subsequent_year_file_path),
+            allow_downloads=True
         )
 
         print(f"Success! {os.path.basename(amy_file_path)} => {os.path.basename(amy_epw_file_path)} ({idx} / {num_files})")

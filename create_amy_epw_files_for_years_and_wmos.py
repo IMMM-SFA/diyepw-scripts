@@ -122,5 +122,6 @@ diyepw.create_amy_epw_files_for_years_and_wmos(
     max_records_to_impute=args.max_records_to_impute,
     max_records_to_interpolate=args.max_records_to_interpolate,
     max_missing_amy_rows=args.max_missing_amy_rows,
-    amy_epw_dir=output_path
+    amy_epw_dir=output_path,
+    allow_downloads=True
 )
