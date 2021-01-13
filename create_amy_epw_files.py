@@ -2,7 +2,6 @@ import os
 import pandas as pd
 import argparse
 import diyepw
-import pkg_resources
 
 # Set path to outputs produced by this script.
 create_out_path = os.path.abspath(os.path.join('outputs', 'create_amy_epw_files_output'))
@@ -55,17 +54,6 @@ parser.add_argument('--max-records-to-impute',
                             the missing value. If there are more consecutive missing records than this limit, then the 
                             file will not be processed, and will be added to the error file at {errors_path}."""
 )
-parser.add_argument('--allow-downloads',
-                    action='store_true',
-                    help=f"""This script depends on TMY (typical meteorological year) EPW files that are available from
-                             http://climate.onebuilding.org. If you pass this option, TMY EPW files will automatically
-                             be downloaded as needed to generate the AMY EPW files defined in files_to_convert.csv.
-                             If you prefer, you may also manually trigger the download of the file for a given WMO Index 
-                             by using the diyepw.get_tmy_epw_file() function provided by the diyepw package in your own 
-                             Python script. Alternatively, you could download the files for whatever WMO Indices you 
-                             intend to generate AMY EPW files for into the following directory: 
-                             {pkg_resources.resource_filename('diyepw', 'data/noaa_isd_lite_files')}"""
-)
 args = parser.parse_args()
 
 # Read in list of AMY files that should be used to create EPW files.
@@ -76,8 +64,6 @@ amy_file_list = amy_file_list[amy_file_list.columns[0]]
 errors = pd.DataFrame(columns=['file', 'error'])
 
 num_files = len(amy_file_list)
-allow_downloads = args.allow_downloads
-disallow_all_downloads = False
 for idx, amy_file_path in enumerate(amy_file_list, start = 1):
     # The NOAA ISD Lite AMY files are stored in directories named the same as the year they describe, so we
     # use that directory name to get the year
@@ -94,7 +80,6 @@ for idx, amy_file_path in enumerate(amy_file_list, start = 1):
     s = os.path.sep
     amy_subsequent_year_file_path = amy_file_path.replace(s + str(year) + s, s + str(next_year) + s)\
                                                  .replace(f'-{year}.gz', f'-{next_year}.gz')
-
     try:
         amy_epw_file_path = diyepw.create_amy_epw_file(
             wmo_index=wmo_index,
@@ -102,14 +87,11 @@ for idx, amy_file_path in enumerate(amy_file_list, start = 1):
             max_records_to_impute=args.max_records_to_impute,
             max_records_to_interpolate=args.max_records_to_interpolate,
             amy_epw_dir=amy_epw_file_out_path,
-            amy_files=(amy_file_path, amy_subsequent_year_file_path),
-            allow_downloads=allow_downloads
+            amy_files=(amy_file_path, amy_subsequent_year_file_path)
         )
+
         print(f"Success! {os.path.basename(amy_file_path)} => {os.path.basename(amy_epw_file_path)} ({idx} / {num_files})")
     except Exception as e:
-        if isinstance(e, diyepw.exceptions.DownloadNotAllowedError) and not disallow_all_downloads:
-            print(f'TMY file required for WMO {wmo_index}. Call this script again with "--allow-downloads" to allow '
-                  f'it to be automatically downloaded.')
         errors = errors.append({"file": amy_file_path, "error": str(e)}, ignore_index=True)
         print(f"\n*** Error! {amy_file_path} could not be processed, see {errors_path} for details ({idx} / {num_files})\n")
 
