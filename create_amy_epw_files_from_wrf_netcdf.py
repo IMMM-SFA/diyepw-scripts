@@ -20,6 +20,7 @@ def convert_wind_vectors_to_speed_and_dir(u: pd.Series(float), v: pd.Series(floa
 
     return wind_speed, wind_dir
 
+# TODO: Support array of wmos and years
 wmo_index = 722195
 year = 2009
 allow_downloads = True
@@ -32,9 +33,11 @@ long = weather_station_row["Station Longitude"]
 
 # We need to process each WRF file for a year (collected together in a directory), and stitch all their data together
 # into a single Pandas array
-data_frame = pd.DataFrame()
+df = pd.DataFrame()
 year_folder = f"/Users/benjamin/Code/diyepw/wrf_{year}"
 for filename in os.listdir(year_folder):
+    print(filename)
+
     # Parse the NetCDF file and extract out the data closest to that lat/long
     ds = xarray.open_dataset(os.path.join(year_folder, filename))
 
@@ -55,29 +58,59 @@ for filename in os.listdir(year_folder):
     # results in time being the columns and variables being the rows, which is not suitable for export to CSV
     ds = ds.to_array().to_pandas().transpose()
 
-    data_frame = pd.concat([data_frame, ds])
+    # Append the data to our DataFrame, which will ultimately contain the full year's data
+    df = pd.concat([df, ds])
 
-data_frame.sort_index(inplace=True)
+# There's no guarantee of what order the weeks will be read in, so sort them before proceeding
+df.sort_index(inplace=True)
 
+# Each week's data in the WRF files runs from midnight of day 1 until midnight of day 8, inclusive.
+# Since midnight of day 8 becomes midnight of day 1 in the next week, there is a single duplicated
+# hour between each pair of weeks when they are stitched together, which we have to remove
+df = df[~df.index.duplicated()]
+
+# TODO: Remove this when no longer needed. The LBNL test data is missing
+#   records for the last two hours of the year. :(
+df.loc[b'2009-12-31_22:00:00'] = df.loc[b'2009-12-31_21:00:00']
+df.loc[b'2009-12-31_23:00:00'] = df.loc[b'2009-12-31_21:00:00']
+
+## Now we have the full year of data for our WMO index, and need to inject it into a TMY meteorology
+## so that we can generate an AMY EPW
 tmy_file = diyepw.get_tmy_epw_file(wmo_index, allow_downloads=allow_downloads)
 meteorology = diyepw.Meteorology.from_tmy3_file(tmy_file)
 
-# TODO: REMOVE THIS! Temporary measure necessary because we don't have a full year of data for testing
-meteorology._observations = meteorology._observations.truncate(after=len(data_frame)-1)
-
 # Atmospheric Pressure, requires no conversion
-meteorology.set("Patm", data_frame.PSFC)
+meteorology.set("Patm", df.PSFC)
 
 # Liquid precipitation depth - just sum up the values, as liquid precipitation is split across three
 # variables in WRF NetCDF
-meteorology.set("LiqPrecDepth", np.sum([data_frame.RAINC, data_frame.RAINSH, data_frame.RAINNC]))
+meteorology.set("LiqPrecDepth", np.sum([df.RAINC, df.RAINSH, df.RAINNC]))
 
 # Dry-bulb temperature - Convert K -> C
-meteorology.set("Tdb", data_frame.T2 + 273.15)
+meteorology.set("Tdb", df.T2 + 273.15)
 
 # - Wind Direction & Speed (V10, U10 - convert from vectors)
-wind_speed, wind_dir = convert_wind_vectors_to_speed_and_dir(data_frame.U10, data_frame.V10)
+wind_speed, wind_dir = convert_wind_vectors_to_speed_and_dir(df.U10, df.V10)
 meteorology.set("Wspeed", wind_speed)
 meteorology.set("Wdir", wind_dir)
 
-meteorology.write_epw("out.epw")
+# Relative humidity conversion algorithm taken from here: https://www.mcs.anl.gov/~emconsta/relhum.txt:
+#
+# define relative humidity matching the algorithm used for hindcasts
+# let pq0 = 379.90516
+# let a2 = 17.2693882
+# let a3 = 273.16
+# let a4 = 35.86
+# let /title="relative humidity" /units="fraction" f_rh2 = q2 / ( (pq0 / psfc) * exp(a2 * (t2 - a3) / (t2 - a4)) )
+#
+# where
+#       q2 = Q2 variable from wrf
+#       t2 = T2 variable from wrf
+#       psfc = surface pressure from WRF
+#
+# This calculates 2 m (approximately) relative humidity.
+meteorology.set("RH", df.Q2 / (379.90516 / df.PSFC) * np.exp(17.2693882 * (df.T2 - 273.16) / (df.T2 - 35.86)))
+
+# Now that we have replaced as much data from the TMY meteorology as possible from the data in the WRF NetCDF,
+# all that is left to do is write out the file as an EPW
+meteorology.write_epw("/Users/benjamin/Code/out.epw")
