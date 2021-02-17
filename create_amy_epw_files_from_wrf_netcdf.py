@@ -35,7 +35,9 @@ long = weather_station_row["Station Longitude"]
 # into a single Pandas array
 df = pd.DataFrame()
 year_folder = f"/Users/benjamin/Code/diyepw/wrf_{year}"
-for filename in os.listdir(year_folder):
+filenames = os.listdir(year_folder)
+filenames.sort() # Not really necessary, but feels right, and makes it easier to watch progress through the files
+for filename in filenames:
     print(filename)
 
     # Parse the NetCDF file and extract out the data closest to that lat/long
@@ -61,13 +63,6 @@ for filename in os.listdir(year_folder):
     # Append the data to our DataFrame, which will ultimately contain the full year's data
     df = pd.concat([df, ds])
 
-# There's no guarantee of what order the weeks will be read in, so sort them before proceeding
-df.sort_index(inplace=True)
-
-# Each week's data in the WRF files runs from midnight of day 1 until midnight of day 8, inclusive.
-# Since midnight of day 8 becomes midnight of day 1 in the next week, there is a single duplicated
-# hour between each pair of weeks when they are stitched together, which we have to remove
-df = df[~df.index.duplicated()]
 
 # TODO: Remove this when no longer needed. The LBNL test data is missing
 #   records for the last two hours of the year. :(
