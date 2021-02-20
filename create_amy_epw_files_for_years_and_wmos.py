@@ -1,7 +1,7 @@
 import diyepw
 import os
 import argparse
-import datetime
+from _parse_years import parse_years
 from typing import List
 
 """
@@ -75,30 +75,6 @@ parser.add_argument('--max-missing-amy-rows',
 )
 args = parser.parse_args()
 
-
-def get_years_list(years_str:str) -> List[int]:
-    """
-    Transform the years argument string, which can be formatted like "2000, 2001, 2005-2010" (individual years or
-    ranges, comma separated, not necessarily sorted, with optional spaces), into a sorted list of integers
-    """
-    # Transform the years argument from a string like  to a sorted list
-    years_list = []
-    years_str = years_str.replace(" ", "")  # Ignore any spaces
-    for year_arg_part in years_str.split(","):  # We'll process each comma-separated entry in the list of years
-        if "-" in year_arg_part:  # If there is a hyphen, then it's a range like "2000-2010"
-            start_year, end_year = year_arg_part.split("-")
-            years_list += range(int(start_year), int(end_year) + 1)
-        else:  # If there is no hyphen, it's just a single year
-            years_list.append(int(year_arg_part))
-    years_list.sort()
-
-    # Validate that the years are between 1900 and the present
-    this_year = datetime.datetime.now().year
-    if min(years_list) < 1900 or max(years_list) > this_year:
-        raise Exception(f"Years must be in the range 1900-{this_year}")
-
-    return years_list
-
 def get_wmo_indices_list(wmo_indices_str) -> List[int]:
     """
     Transforms the wmo-indices argument, which should be a comma-separated list of WMO indices, into a sorted list of
@@ -113,7 +89,7 @@ def get_wmo_indices_list(wmo_indices_str) -> List[int]:
 
     return wmo_indices_list
 
-years = get_years_list(args.years)
+years = parse_years(args.years)
 wmo_indices = get_wmo_indices_list(args.wmo_indices)
 
 diyepw.create_amy_epw_files_for_years_and_wmos(
